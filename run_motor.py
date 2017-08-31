@@ -5,9 +5,9 @@ A1Pin = 36
 A2Pin = 38
 Pwm1Pin = 40
 
-Bin1Pin = 12
-Bin2Pin = 16
-PwmPin =  22
+Bin1Pin = 31
+Bin2Pin = 33
+PwmPin = 35
 
 
 def setup():
