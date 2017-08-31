@@ -1,0 +1,27 @@
+import RPi.GPIO as GPIO
+import time
+
+digital_pin = 29
+
+def setup():
+    GPIO.setmode(GPIO.BOARD)
+    GPIO.setup(digital_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+def loop():
+    while True:
+        sndIn = GPIO.input(digital_pin)
+        if sndIn == 0:
+            print("Hey it works")
+        else:
+            print("")
+
+def destroy(): 
+        GPIO.cleanup()   
+
+
+if __name__ == '__main__':
+        setup()
+        try:
+                loop()
+        except KeyboardInterrupt:           
+                destroy()
