@@ -143,7 +143,7 @@ def avoidRight():
                 sensor_condition = False
         else:
             sensor_condition = False
-    forward()
+    #forward()
     time.sleep(.1)
     turnRight()
     time.sleep(timer*.02222222)
@@ -164,7 +164,7 @@ def avoidLeft():
                 sensor_condition = False
         else:
             sensor_condition = False
-    forward()
+    #forward()
     time.sleep(.1)
     turnLeft()
     time.sleep(timer*.02222222)
@@ -249,15 +249,15 @@ def loop():
          
         elif state == 1:
             print("heyyyyy")
-            forward()
+            #forward()
             
             if dist < 30 and dist > 1:
                 nextstate = avoidLeft()
-                print("the state for avoidLeft is ", nextstate)
+                #print("the state for avoidLeft is ", nextstate)
                 
             elif dist_2 < 30 and dist_2 > 1:
                 nextstate = avoidRight()
-                print("the state for avoidRight is ", nextstate)
+                #print("the state for avoidRight is ", nextstate)
 
             elif soundval > threshold or soundval_2 > threshold:
                 nextstate = 0
