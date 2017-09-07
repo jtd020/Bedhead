@@ -1,0 +1,238 @@
+import RPi.GPIO as GPIO
+import time
+import Adafruit_GPIO.SPI as SPI
+import Adafruit_MCP3008
+import numpy as np
+import file_name as fn
+
+#motor 1
+A1Pin = 16
+A2Pin = 20
+Pwm1Pin = 21
+
+#motor 2
+Bin1Pin = 6
+Bin2Pin = 13
+PwmPin =  19
+
+#ADC/sound detectors
+CLK  = 18
+MISO = 23
+MOSI = 24
+CS   = 25
+mcp = Adafruit_MCP3008.MCP3008(clk=CLK, cs=CS, miso=MISO, mosi=MOSI)
+
+#ultrasound 1
+GPIO_TRIGGER = 17
+GPIO_ECHO = 27
+
+#ultrasound 2
+GPIO_TRIGGER_2 = 12
+GPIO_ECHO_2 = 22
+
+
+def stop():
+    """Stops motor"""
+    GPIO.output(A1Pin, GPIO.HIGH)
+    GPIO.output(A2Pin, GPIO.HIGH)
+    GPIO.output(Pwm1Pin, GPIO.HIGH)
+    """Stops 2nd motor"""
+    GPIO.output(Bin1Pin, GPIO.HIGH)
+    GPIO.output(Bin2Pin, GPIO.HIGH)
+    GPIO.output(PwmPin, GPIO.HIGH)
+
+def forward():
+    """Moves 2nd motor at full speed backward"""
+    GPIO.output(Bin1Pin, GPIO.HIGH)
+    GPIO.output(Bin2Pin, GPIO.LOW)
+    GPIO.output(PwmPin, GPIO.HIGH)
+    
+    """Moves motor at full speed backward"""
+    GPIO.output(A1Pin, GPIO.HIGH)
+    GPIO.output(A2Pin, GPIO.LOW)
+    GPIO.output(Pwm1Pin, GPIO.HIGH)
+    
+    
+def backward():
+    """Moves motor at full speed"""
+    GPIO.output(A1Pin, GPIO.LOW)
+    GPIO.output(A2Pin, GPIO.HIGH)
+    GPIO.output(Pwm1Pin, GPIO.HIGH)
+
+    """Moves 2nd motor at full speed """
+    GPIO.output(Bin1Pin, GPIO.LOW)
+    GPIO.output(Bin2Pin, GPIO.HIGH)
+    GPIO.output(PwmPin, GPIO.HIGH)
+
+    #time.sleep(.5)
+
+def turnRight():
+    """Moves motor at full speed forward"""
+    GPIO.output(A1Pin, GPIO.LOW)
+    GPIO.output(A2Pin, GPIO.HIGH)
+    GPIO.output(Pwm1Pin, GPIO.HIGH)
+    """Moves 2nd motor at full speed backward"""
+    GPIO.output(Bin1Pin, GPIO.HIGH)
+    GPIO.output(Bin2Pin, GPIO.LOW)
+    GPIO.output(PwmPin, GPIO.HIGH)
+    
+def turnLeft():
+    """Moves motor at full speed backward"""
+    GPIO.output(A1Pin, GPIO.HIGH)
+    GPIO.output(A2Pin, GPIO.LOW)
+    GPIO.output(Pwm1Pin, GPIO.HIGH)
+    """Moves 2nd motor at full speed """
+    GPIO.output(Bin1Pin, GPIO.LOW)
+    GPIO.output(Bin2Pin, GPIO.HIGH)
+    GPIO.output(PwmPin, GPIO.HIGH)
+
+def settleUltrasound():
+    """sets up the ultrasound sensors for initial use"""
+    GPIO.output(GPIO_TRIGGER, False)
+    GPIO.output(GPIO_TRIGGER_2, False)
+    time.sleep(2)
+
+def distance(GPIO_TRIGGER,GPIO_ECHO):
+    """calculates the distance of objects in front of the ultrasound sensors"""
+    # set Trigger to HIGH
+    GPIO.output(GPIO_TRIGGER, True)
+ 
+    # set Trigger after 0.01ms to LOW
+    time.sleep(0.00001)
+    GPIO.output(GPIO_TRIGGER, False)
+
+    valid = True
+    RefTime = time.time()
+    StartTime = RefTime
+    #print(StartTime)
+    # save StartTime
+    while (GPIO.input(GPIO_ECHO) == 0) and (StartTime-RefTime < 0.1):
+        StartTime = time.time()
+    if (StartTime-RefTime >= 0.1):
+        valid = False
+        
+    RefTime = time.time()
+    StopTime = time.time()
+    # save time of arrival
+    while (GPIO.input(GPIO_ECHO) == 1) and (StopTime-RefTime < 0.2):
+        StopTime = time.time()
+    if (StopTime-RefTime >= 0.1):
+        valid = False
+        
+    
+    if (valid):
+        # time difference between start and arrival
+        TimeElapsed = StopTime - StartTime
+
+        # multiply with the sonic speed (34300 cm/s)
+        # and divide by 2, because there and back
+        distance = (TimeElapsed * 34300) / 2
+    else:
+        distance = -1
+        
+    return distance
+
+def avoidRight(distance_threshold, error_range):
+    """avoids obstacles to the right"""
+    #print("It reaches avoidRight")
+    nextstate = 1
+    timer = 0
+    turnLeft()
+    sensor_condition = True
+    while sensor_condition:
+        if distance(GPIO_TRIGGER, GPIO_ECHO) < distance_threshold:
+            #print(distance(GPIO_TRIGGER,GPIO_ECHO))
+            timer += 1
+            time.sleep(.2222222)
+            print("It reaches avoidRight loop")
+            #print("This has been running for ", (timer)*.2222222)
+            if distance(GPIO_TRIGGER_2, GPIO_ECHO_2) < distance_threshold:
+                return 0
+        else:
+            sensor_condition = False
+    stop()
+    time.sleep(.5)
+    forward()
+    time.sleep(.75)
+    stop()
+    time.sleep(.5)
+    turnRight()
+    time.sleep((timer)*.2222222)
+    stop()
+    return nextstate
+
+def avoidLeft(distance_threshold, error_range):
+    """avoids obstacles to the left""" 
+    #print("It reaches avoidLeft")
+    nextstate = 1
+    timer = 0
+    turnRight()
+    sensor_condition = True
+    
+    while sensor_condition:
+        if distance(GPIO_TRIGGER_2, GPIO_ECHO_2) < distance_threshold :
+            #print(distance(GPIO_TRIGGER_2, GPIO_ECHO_2))
+            timer += 1
+            time.sleep(.2222222)
+            print("It reaches avoidLeft loop")
+            #print("This has been running for ", (timer)*.2222222)
+            if distance(GPIO_TRIGGER, GPIO_ECHO) < distance_threshold :
+                return 0
+        else:
+            sensor_condition = False
+
+    stop()
+    time.sleep(.5)
+    forward()
+    time.sleep(.75)
+    stop()
+    time.sleep(.5)
+    turnLeft()
+    time.sleep((timer)*.2222222)
+    stop()
+    return nextstate
+
+def time_difference(soundval, soundval_2, threshold, max_time):
+    detected_1st =  False
+    detected_2nd = False
+    time_sensor1 = 0
+    time_sensor2 = 0
+    start_time = time.time()
+    current_time = time.time()
+    print("IIII")
+    while (not (detected_1st and detected_2nd)) and (current_time - start_time < max_time):
+        sound1_condition = (soundval > threshold)
+        sound2_condition = (soundval_2 > threshold)
+        if (sound1_condition):
+            detected_1st = True
+            time_sensor1 = time.time()
+            print("time_sensor1 = ",time_sensor1)
+        if (sound2_condition):
+            detected_2nd = True
+            time_sensor2 = time.time()
+            print("time_sensor2 = ",time_sensor2)
+        current_time = time.time()
+        #print("current time is ", current_time)
+        #print(current_time-time_sensor1)
+        #print(current_time-time_sensor2)
+
+    if (detected_1st and detected_2nd):
+        return (current_time-time_sensor1) - (current_time-time_sensor2)
+    else:
+        return 0
+
+def calcAngle(sound, avg, threshold):
+    """calaculates (roughly) the angle the sound came from"""
+    range_threshold = threshold - avg
+    angle_degree = (float(range_threshold))/90.0
+    range_sound = sound - avg
+    return abs(90-(range_sound/angle_degree))
+
+def calcAvg(n):
+    """caclulates the average of the background noise"""
+    avg = 0
+    for i in range(n):
+        avg += ((mcp.read_adc(1)+mcp.read_adc(0))/2)
+    return avg/n
+
+
