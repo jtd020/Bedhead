@@ -1,0 +1,317 @@
+import RPi.GPIO as GPIO
+import time
+import Adafruit_GPIO.SPI as SPI
+import Adafruit_MCP3008
+import numpy as np
+import file_name as fn
+
+#motor 1
+A1Pin = 16
+A2Pin = 20
+Pwm1Pin = 21
+
+#motor 2
+Bin1Pin = 6
+Bin2Pin = 13
+PwmPin =  19
+
+#ADC/sound detectors
+CLK  = 18
+MISO = 23
+MOSI = 24
+CS   = 25
+mcp = Adafruit_MCP3008.MCP3008(clk=CLK, cs=CS, miso=MISO, mosi=MOSI)
+
+#ultrasound 1
+GPIO_TRIGGER = 17
+GPIO_ECHO = 27
+
+#ultrasound 2
+GPIO_TRIGGER_2 = 12
+GPIO_ECHO_2 = 22
+
+def setup():
+    GPIO.setmode(GPIO.BCM)
+
+    #motor
+    GPIO.setup(A1Pin, GPIO.OUT)
+    GPIO.setup(A2Pin, GPIO.OUT)
+    GPIO.setup(Pwm1Pin, GPIO.OUT)
+    
+    #motor 2
+    GPIO.setup(Bin1Pin, GPIO.OUT)
+    GPIO.setup(Bin2Pin, GPIO.OUT)
+    GPIO.setup(PwmPin, GPIO.OUT)
+
+    #ultrasound 1
+    GPIO.setup(GPIO_TRIGGER, GPIO.OUT)
+    GPIO.setup(GPIO_ECHO, GPIO.IN)
+
+    #ultrasound 2
+    GPIO.setup(GPIO_TRIGGER_2, GPIO.OUT)
+    GPIO.setup(GPIO_ECHO_2, GPIO.IN)
+    fn.settleUltrasound()
+    
+def countClaps(n,timer):
+    print("start clapping")
+    threshold = 70
+    soundval = mcp.read_adc(1)
+    start_time = time.time()
+    current_time = time.time()
+    counter = 0
+    last_soundval = 0
+    while (current_time - start_time < timer):
+        sound1_condition = (soundval > threshold)
+        if sound1_condition and counter < n:
+            counter += 1
+            last_soundval = soundval
+        current_time = time.time()
+        soundval = mcp.read_adc(1)
+        print(soundval)
+        time.sleep(.2)
+    return (counter, last_soundval)
+
+def helper():
+    state = 0
+    loop_condition = True
+    while loop_condition:
+        dist = fn.distance(GPIO_TRIGGER, GPIO_ECHO)
+        dist_2 = fn.distance(GPIO_TRIGGER_2, GPIO_ECHO_2)
+        print ("Measured Distance = %.1f cm" % dist)
+        print("Measured Distance_2 = %.1f cm" % dist_2)        
+        soundval = mcp.read_adc(1)
+        print(mcp.read_adc(0), mcp.read_adc(1))
+        start_time = time.time()
+        current_time = time.time()
+        current_claps = countClaps()
+        state = current_claps[0]
+        if state == 0:
+            fn.stop()
+        elif state == 1:
+            fn.forward()
+            time.sleep(float(current_claps[1]/threshold))
+            state = 0
+        elif state == 2:
+            fn.backward()
+            time.sleep(float(current_claps[1]/threshold))
+            state = 0
+        elif state == 3:
+            angle = fn.calcAngle(current_claps[1],   , threshold)
+            fn.turnLeft()
+            time.sleep(angle * .05555556)        
+        elif state == 4:
+            angle = fn.calcAngle(current_claps[1],   , threshold)
+            fn.turnRight()
+            time.sleep(angle * .05555556)
+        elif state == 5:
+            loop_condition = False
+            
+
+def fun_and_stuff(threshold):
+    while True:
+        dist = fn.distance(GPIO_TRIGGER, GPIO_ECHO)
+        dist_2 = fn.distance(GPIO_TRIGGER_2, GPIO_ECHO_2)
+        print ("Measured Distance = %.1f cm" % dist)
+        print("Measured Distance_2 = %.1f cm" % dist_2)        
+        soundval = mcp.read_adc(1)
+        print(mcp.read_adc(0), mcp.read_adc(1))
+        state = 6
+        if state == 0:
+            start_time = time.time()
+            current_time = time.time()
+            while (not detected_1st and (current_time - start_time < max_time)):
+                sound1_condition = (soundval > threshold)
+                if sound1_condition and counter < 25:
+                    counter += 1
+                current_time = time.time()
+                soundval = mcp.read_adc(1)
+            nextstate = counter
+            print(nextstate)
+            
+        elif state == 1:
+            start_time = time.time()
+            current_time = time.time()
+            forward()
+            if dist < distance_threshold and dist > 1:
+                nextstate = fn.avoidRight(distance_threshold,error_range)
+                
+            elif dist_2 < distance_threshold and dist_2 > 1:
+                nextstate = fn.avoidLeft(distance_threshold,error_range)
+                
+
+        elif state == 2:
+            """the back and back"""
+            fn.backward()
+            time.sleep(.3)
+            fn.turnLeft()
+            time.sleep(1)
+            fn.backward()
+            time.sleep(.3)
+            fn.turnrRight()
+            time.sleep(1)
+            
+        elif state == 3:
+            """the counter-clockwise circle"""
+            fn.turnLeft()
+            
+        elif state == 4:
+            """the clockwise circle"""
+            fn.turnRight()
+        
+        elif state == 5:
+            """ the 180 and -180"""
+            fn.turnLeft()
+            time.sleep(1)
+            fn.turnRight()
+            time.sleep(1)
+
+        elif state == 6:
+            """the shiver"""
+            fn.turnLeft()
+            time.sleep(.01)
+            fn.turnRight()
+            time.sleep(.01)
+            
+        elif state == 7:
+            """the shake"""
+            fn.turnLeft()
+            time.sleep(.2)
+            fn.stop()
+            time.sleep(.4)
+            fn.turnRight()
+            time.sleep(.2)
+            fn.stop()
+            time.sleep(.4)
+
+        elif state == 8:
+            """the "no" """
+            fn.turnLeft()
+            time.sleep(.2)
+            fn.stop()
+            time.sleep(.05)
+            fn.turnRight()
+            time.sleep(.2)
+            fn.stop()
+            time.sleep(.05)
+        
+        elif state == 9:
+            """the agressive attacker"""
+            fn.forward()
+            time.sleep(.5)
+            fn.stop()
+            time.sleep(.1)
+            fn.backward()
+            time.sleep(.1)
+    
+
+        elif state == 10:
+            """the twirl"""
+            fn.turnLeft()
+            time.sleep(2)
+            fn.forward()
+            time.sleep(.3)
+            fn.turnRight()
+            time.sleep(2)
+            fn.backward()
+            time.sleep(.3)
+            
+
+        elif state == 11:
+            """the donut"""
+            GPIO.output(A1Pin, GPIO.HIGH)
+            GPIO.output(A2Pin, GPIO.HIGH)
+            GPIO.output(Pwm1Pin, GPIO.HIGH)
+
+            GPIO.output(Bin1Pin, GPIO.HIGH)
+            GPIO.output(Bin2Pin, GPIO.LOW)
+            GPIO.output(PwmPin, GPIO.HIGH)
+        
+            
+        elif state == 12:
+            """the other donut"""
+            GPIO.output(A1Pin, GPIO.HIGH)
+            GPIO.output(A2Pin, GPIO.LOW)
+            GPIO.output(Pwm1Pin, GPIO.HIGH)
+
+            GPIO.output(Bin1Pin, GPIO.HIGH)
+            GPIO.output(Bin2Pin, GPIO.HIGH)
+            GPIO.output(PwmPin, GPIO.HIGH)
+
+            soundval = mcp.read_adc(1)
+
+        elif state == 13:
+            """the "what the heck did you feed this kid" """
+            fn.forward()
+            time.sleep(.5)
+            fn.turnLeft()
+            random = np.random.random()
+            time.sleep(random)
+            fn.backward()
+            fn.turnRight()
+            random = np.random.random()
+            time.sleep(random)
+            
+        elif state == 14:
+            """the crawl"""
+            GPIO.output(A1Pin, GPIO.HIGH)
+            GPIO.output(A2Pin, GPIO.LOW)
+            GPIO.output(Pwm1Pin, GPIO.HIGH)
+
+            GPIO.output(Bin1Pin, GPIO.HIGH)
+            GPIO.output(Bin2Pin, GPIO.HIGH)
+            GPIO.output(PwmPin, GPIO.HIGH)
+            
+            time.sleep(.1)
+
+            GPIO.output(A1Pin, GPIO.HIGH)
+            GPIO.output(A2Pin, GPIO.HIGH)
+            GPIO.output(Pwm1Pin, GPIO.HIGH)
+
+            GPIO.output(Bin1Pin, GPIO.HIGH)
+            GPIO.output(Bin2Pin, GPIO.LOW)
+            GPIO.output(PwmPin, GPIO.HIGH)
+            
+        else:    
+            nextstate = 0
+def loop():
+    """loops the program"""
+    #nextstate = 0
+    #distance_threshold = 20
+    threshold = 100
+    max_time = 3
+    error_range = .5
+    vg = calcAvg(5)
+    detected_1st =  False
+    counter = 0
+    while True:
+        dist = distance(GPIO_TRIGGER, GPIO_ECHO)
+        dist_2 = distance(GPIO_TRIGGER_2, GPIO_ECHO_2)
+        #print ("Measured Distance = %.1f cm" % dist)
+        #print("Measured Distance_2 = %.1f cm" % dist_2)        
+        soundval = mcp.read_adc(1)
+        print(mcp.read_adc(0), mcp.read_adc(1))
+        counter = countClaps(2)
+
+        if counter == 1:
+            helper()
+
+        elif counter == 2:
+            fun_and_stuff(threshold)
+            
+def destroy():
+    """ends the program"""
+    GPIO.output(A1Pin, GPIO.HIGH)
+    GPIO.output(A2Pin, GPIO.HIGH)
+    GPIO.output(Bin1Pin, GPIO.HIGH)
+    GPIO.output(Bin2Pin, GPIO.HIGH)
+    GPIO.cleanup()
+
+
+if __name__ == '__main__':
+    
+    setup()
+    try:
+        loop()
+    except KeyboardInterrupt:   # When 'Ctrl+C' is pressed, the child program destroy() will be  executed.
+        destroy()
+
